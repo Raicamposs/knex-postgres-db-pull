@@ -52,6 +52,10 @@ function generator(schema, table, fields, constraints) {
           if (!(field.column_default ?? "").includes("nextval"))
             column = column + `.defaultTo(${column_default})`;
           break;
+      case "timestamp without time zone":
+      case "timestamp with time zone":
+            column = column + `.defaultTo(knex.fn.now())`;
+          break;
         default:
           column =
             column + `.defaultTo(\`${column_default.replaceAll(`'`, "")}\`)`;
@@ -64,13 +68,18 @@ function generator(schema, table, fields, constraints) {
   const foreignKeys = constraints.map((constraint) => {
     switch (constraint?.constraint_type ?? "") {
       case "PRIMARY KEY":
-        return `table.primary(['${constraint.column_name}'],{constraintName:'${constraint.constraint_name}'})`;
+        return `table.primary(['${constraint.column_name}'],{constraintName:'${table}_primary_key'})`;
 
       case "FOREIGN KEY":
         return `table
-        .foreign('${constraint.column_name}','${constraint.constraint_name}')
+        .foreign('${constraint.column_name}','${table}_fk_${constraint.foreign_table_name}')
         .references('${constraint.foreign_column_name}')
         .inTable('${constraint.foreign_table_schema}.${constraint.foreign_table_name}') 
+
+        table.index(
+                    ['${constraint.column_name}'],
+                    '${table}_idx_${constraint.column_name}'
+                )
       `;
 
       case "UNIQUE":
@@ -85,9 +94,9 @@ function generator(schema, table, fields, constraints) {
 import { Knex } from 'knex'
 
 export async function up(knex: Knex): Promise<void> {
-  knex.schema.withSchema('${schema}').hasTable('${table}').then( (exists) => {
+  return knex.schema.withSchema('${schema}').hasTable('${table}').then( (exists) => {
     if (!exists) {
-      return knex.schema.withSchema('${schema}').alterTable('${table}', (table) => {
+      return knex.schema.withSchema('${schema}').createTable('${table}', (table) => {
         ${[...columns, "", ...foreignKeys].join("\n        ")}
       })
     }
@@ -100,4 +109,4 @@ export async function down(knex: Knex): Promise<void> {
 `;
 }
 
-module.exports = gen;
+module.exports = generator;

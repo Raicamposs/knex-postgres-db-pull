@@ -100,7 +100,7 @@ const generate = async () => {
         now.getFullYear(),
         now.getMonth() + 1,
         now.getDate(),
-        now.getHours(),
+        now.getHours() + 3,
         now.getMinutes(),
         now.getSeconds(),
       ]
